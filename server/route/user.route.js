@@ -19,6 +19,5 @@ userRouter.get("/user-data", auth, getUserProfile);
 userRouter.get("/all-users", auth, officer, getAllUsers);
 
 
-
 export default userRouter;
 

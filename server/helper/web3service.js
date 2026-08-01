@@ -112,7 +112,7 @@ export const addLandOnChain = async (landData, fileSource) => {
   if (fileSource) {
    bytes32DocHash = generateDocumentHash(fileSource, cleanLandId);
   } else {
-   // Fallback unique bytes32 hash to satisfy "Document hash required" requirement
+   // Fallback unique bytes32 hash to satisfy "Document hash required" requirement just for this need to remocve 
    bytes32DocHash = ethers.keccak256(
     ethers.toUtf8Bytes(`DOC-${cleanLandId}-${Date.now()}`)
    );

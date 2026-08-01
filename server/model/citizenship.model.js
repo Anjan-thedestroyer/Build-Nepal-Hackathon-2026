@@ -13,16 +13,6 @@ const citizenshipSchema = new mongoose.Schema(
    required: true,
    trim: true,
   },
-  citizenshipDocumentPath: {
-   type: String, // Path to uploaded PDF/image via Multer
-   required: true,
-  },
-  citizenshipHash: {
-   type: String,
-   required: true,
-   unique: true,
-   index: true,
-  },
   user: {
    type: mongoose.Schema.Types.ObjectId,
    ref: "User",

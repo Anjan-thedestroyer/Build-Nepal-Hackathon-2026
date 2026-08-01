@@ -18,6 +18,11 @@ const lalpurjaSchema = new mongoose.Schema(
    type: String,
    required: true,
   },
+  documentHash: {
+  type: String,
+  required: true,
+  unique: true,
+},  
   buyngPrice:{
     type: Number,
     required: true,
@@ -27,7 +32,7 @@ const lalpurjaSchema = new mongoose.Schema(
     required : true
   },
   taxRate:{
-    type : Number
+    type: Number,
   },
   district: { type: String, required: true, trim: true },
   municipality: { type: String, required: true, trim: true }, // Local Government

@@ -3,14 +3,21 @@ import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { UserModel } from "../model/user.model.js";
 import { CitizenshipModel } from "../model/citizenship.model.js";
+import { LalpurjaModel } from "../model/lalpurja.model.js";
 
 const JWT_SECRET = process.env.JWT_SECRET;
 
 export const registerUser = async (req, res) => {
-  let createdUserId = null;
+    let createdUserId = null;
+    if (!req.body) {
+    return res.status(400).json({
+        success: false,
+        message: "Request body is missing.",
+    });
+    }
 
-  try {
     const { fullName, email, password, citizenshipNo, issueDistrict } = req.body;
+  try {
 
     const existingUser = await UserModel.findOne({
       email: email.toLowerCase(),
