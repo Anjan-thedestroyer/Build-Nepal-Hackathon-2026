@@ -52,7 +52,6 @@ enum TransferStatus { NonExistent, Pending, Executed, Cancelled }
   mapping(address => bool) public isOfficer;
   mapping(uint256 => Property) public properties;
   
-  // Uniqueness Enforcers
   mapping(bytes32 => bool) private cadastralHashes;
   mapping(bytes32 => bool) private lalpurjaHashes;
   mapping(bytes32 => bool) public documentHashes; 
@@ -87,14 +86,14 @@ enum TransferStatus { NonExistent, Pending, Executed, Cancelled }
   }
 
   constructor(address initialAdmin) Ownable(initialAdmin) {
-    require(initialAdmin != address(0), "DMalpot: Invalid admin address");
+    require(initialAdmin != address(0), "Invalid address");
     isOfficer[initialAdmin] = true;
     emit OfficerStatusUpdated(initialAdmin, true);
   }
 
 
   function setOfficerStatus(address _officer, bool _status) external onlyOwner {
-    require(_officer != address(0), "DMalpot: Invalid officer address");
+    require(_officer != address(0), "Invalid address");
     isOfficer[_officer] = _status;
     emit OfficerStatusUpdated(_officer, _status);
   }
@@ -177,5 +176,107 @@ enum TransferStatus { NonExistent, Pending, Executed, Cancelled }
   }
 
 
+  function initiateTransfer(
+    uint256 _landId,
+    string memory _sellerCitizenshipNo,
+    string memory _buyerCitizenshipNo,
+    uint256 _price
+  ) external onlyOfficer landExists(_landId) returns (uint256) {
+    Property memory land = properties[_landId];
+    require(!land.isFrozen, "DMalpot: Property is frozen and cannot be transferred");
+
+    uint256 requestId = nextTransferRequestId++;
+    transferRequests[requestId] = LandTransferRequest({
+      requestId: requestId,
+      landId: _landId,
+      sellerCitizenshipNo: _sellerCitizenshipNo,
+      buyerCitizenshipNo: _buyerCitizenshipNo,
+      price: _price,
+      status: TransferStatus.Pending,
+      createdAt: block.timestamp
+    });
+
+    emit TransferRequested(requestId, _landId, _sellerCitizenshipNo, _buyerCitizenshipNo, _price);
+    return requestId;
+  }
+
+  function executeTransfer(uint256 _requestId) external onlyOfficer landExists(transferRequests[_requestId].landId) nonReentrant {
+    LandTransferRequest storage request = transferRequests[_requestId];
+    require(request.status == TransferStatus.Pending, "DMalpot: Request is not pending");
+
+    Property storage land = properties[request.landId];
+    require(!land.isFrozen, "DMalpot: Property is frozen");
+
+    uint256[] storage sellerLands = citizenToLandIds[request.sellerCitizenshipNo];
+    for (uint256 i = 0; i < sellerLands.length; i++) {
+      if (sellerLands[i] == request.landId) {
+        sellerLands[i] = sellerLands[sellerLands.length - 1];
+        sellerLands.pop();
+        break;
+      }
+    }
+
+    citizenToLandIds[request.buyerCitizenshipNo].push(request.landId);
+
+    delete land.citizenshipNumbers;
+    land.citizenshipNumbers.push(request.buyerCitizenshipNo);
+
+    request.status = TransferStatus.Executed;
+    emit TransferExecuted(_requestId, request.landId);
+  }
+ 
+  function getLand(uint256 _landId)
+    external
+    view
+    landExists(_landId)
+    returns (
+      uint256 landId,
+      string memory lalpurjaNo,
+      bytes32 documentHash,
+      CadastralAddress memory cadastral,
+      LandCategory category,
+      uint256 areaInSqMeters,
+      bool isFrozen,
+      string[] memory ownerCitizenshipNumbers,
+      Coordinate[] memory boundaries
+    )
+  {
+    Property memory land = properties[_landId];
+    return (
+      land.landId,
+      land.lalpurjaNo,
+      land.documentHash,
+      land.cadastral,
+      land.category,
+      land.areaInSqMeters,
+      land.isFrozen,
+      land.citizenshipNumbers,
+      landBoundaries[_landId]
+    );
+  }
+
   
+  function getLandsByCitizen(string memory _citizenshipNo) external view returns (uint256[] memory) {
+    return citizenToLandIds[_citizenshipNo];
+  }
+
+
+  function getLandsByWard(
+    string memory _district,
+    string memory _localGovernment,
+    uint8 _wardNumber
+  ) external view returns (uint256[] memory) {
+    bytes32 wardKey = keccak256(abi.encodePacked(_district, _localGovernment, _wardNumber));
+    return wardToLandIds[wardKey];
+  }
+
+  
+  function getLandBoundaries(uint256 _landId) external view landExists(_landId) returns (Coordinate[] memory) {
+    return landBoundaries[_landId];
+  }
+
+ 
+  function verifyDocumentHash(uint256 _landId, bytes32 _submittedHash) external view landExists(_landId) returns (bool) {
+    return properties[_landId].documentHash == _submittedHash;
+  }
 }
