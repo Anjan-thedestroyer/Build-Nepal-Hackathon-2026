@@ -8,16 +8,12 @@ import {console} from "forge-std/console.sol";
 contract DeployDMalpot is Script {
   function run() external {
     uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
-
     vm.startBroadcast(deployerPrivateKey);
-
     address initialAdmin = vm.addr(deployerPrivateKey);
-
     DMalpot dMalpot = new DMalpot(initialAdmin);
-
     vm.stopBroadcast();
 
-    console.log("DMalpot deployed at:", address(dMalpot));
+    console.log("DMalpot:", address(dMalpot));
     console.log("Owner:", initialAdmin);
   }
 
