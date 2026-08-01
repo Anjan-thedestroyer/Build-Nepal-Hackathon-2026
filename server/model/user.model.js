@@ -23,7 +23,7 @@ const userSchema = new mongoose.Schema(
    type: String,
    lowercase: true,
    trim: true,
-   default: null, 
+   default: null, // Optional on initial register, updated when Web3 wallet connects
   },
   role: {
    type: String,

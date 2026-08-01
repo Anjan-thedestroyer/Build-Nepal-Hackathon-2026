@@ -5,6 +5,7 @@ import helmet from 'helmet';
 import fs from 'fs';
 import cookieParser from 'cookie-parser';
 import { connect } from "./config/connectDB.js";
+import userRouter from "./route/user.route.js";
 dotenv.config();
 const app = express();
 const PORT = process.env.PORT;
@@ -29,9 +30,8 @@ app.use('/uploads', express.static('uploads'));
 
 
 
-// Health Check Endpoint
 app.get('/health', (req, res) => {
-  res.status(200).json({ status: 'OK', message: 'DMalpot API is running smoothly.' });
+  res.status(200).json({ status: 'OK', message: 'DMalpot running.' });
 });
 
 app.use((req, res, next) => {
@@ -45,13 +45,14 @@ app.use((err, req, res, next) => {
   });
 });
 
+app.use('/api/users', userRouter);
+
 const startServer = async () => {
   try {
-    // Connect via your custom connectDB utility module
     await connect();
     
     app.listen(PORT, () => {
-      console.log(`DMalpot Backend Server listening on port ${PORT}`);
+      console.log(`listening on port ${PORT}`);
     });
   } catch (error) {
     console.error(`Database Connection Failure: ${error.message}`);
