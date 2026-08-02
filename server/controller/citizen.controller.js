@@ -4,16 +4,11 @@ import { getLandFromChain } from "../helper/web3service.js";
 import { extractPdfText, parseCadastralData } from "../utils/pdfScanner.js";
 import fs from "fs";
 
-/**
-* 1. Get All Lands Owned by the Authenticated Citizen
-* @route GET /api/v1/citizen/my-lands
-* @access Protected (Citizen)
-*/
+
 export const getMyLands = async (req, res) => {
  try {
   const userId = req.user._id;
 
-  // Fetch user with linked citizenship and lalpurjas
   const user = await UserModel.findById(userId)
    .populate("citizenship")
    .populate({
@@ -27,13 +22,11 @@ export const getMyLands = async (req, res) => {
 
   const citizenshipHash = user.citizenship?.citizenshipHash;
 
-  // Enrich each land record with On-Chain verification status
   const verifiedLands = await Promise.all(
    user.lalpurjas.map(async (land) => {
     try {
      const chainData = await getLandFromChain(land.landId);
 
-     // Verify if user's citizenship hash is present in on-chain owners
      const isOnChainOwner = chainData?.ownerCitizenshipHashes?.includes(
       citizenshipHash
      );
