@@ -2,8 +2,10 @@ import API from "./axios";
 
 // Public / Search: Get land details by Ward Number via GET path parameter
 export const getLandByWard = (wardNo, district = "", municipality = "") => {
-  return API.get(`/lalpurja/ward/${wardNo}`, {
-    params: { district, municipality },
+  return API.post(`/lalpurja/ward/`, {
+    wardNo,
+    district,
+    municipality
   });
 };
 

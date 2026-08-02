@@ -10,26 +10,6 @@ import Login from "./pages/auth/Login";
 import Register from "./pages/auth/Register";
 import AdminDashboard from "./pages/officer/AdminDashboard";
 
-// Placeholder Dashboards (Replace with your actual imports when ready)
-
-
-const OfficerDashboard = () => (
-  <div className="page">
-    <div className="card">
-      <h2 className="card__title">Officer Portal</h2>
-      <p>Register new Lalpurja, transfer land deeds, and freeze/unfreeze titles.</p>
-    </div>
-  </div>
-);
-
-const PublicLandSearch = () => (
-  <div className="page">
-    <div className="card">
-      <h2 className="card__title">Public Cadastral Search</h2>
-      <p>Search Kitta numbers and Ward boundaries public records.</p>
-    </div>
-  </div>
-);
 
 export default function App() {
   return (
@@ -41,7 +21,7 @@ export default function App() {
       <main>
         <Routes>
           {/* Public Routes */}
-          <Route path="/" element={<PublicLandSearch />} />
+          <Route path="/" element={ <CitizenDashboard />} />
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
 

@@ -50,6 +50,26 @@ const sqmToRopani = (sqm) => {
   return parts.join(', ') || `${sqm} m²`;
 };
 
+// Tax calculation helper based on land category
+const getTaxInfo = (category) => {
+  const taxRates = {
+    'Agricultural': { rate: 10, label: 'Agricultural Land Tax', color: '#0b6e4f' },
+    'Residential': { rate: 5, label: 'Residential Land Tax', color: '#2563eb' },
+    'Commercial': { rate: 15, label: 'Commercial Land Tax', color: '#dc2626' },
+    'Industrial': { rate: 12, label: 'Industrial Land Tax', color: '#d97706' },
+    'Forest/Conservation': { rate: 2, label: 'Conservation Land Tax', color: '#059669' },
+    'Public/Government': { rate: 0, label: 'Government Land (Exempt)', color: '#64748b' },
+    'Mixed': { rate: 8, label: 'Mixed Use Land Tax', color: '#7c3aed' },
+  };
+  return taxRates[category] || { rate: 5, label: 'Standard Land Tax', color: '#2563eb' };
+};
+
+// Calculate tax amount
+const calculateTax = (category, bookValue) => {
+  const taxInfo = getTaxInfo(category);
+  return (bookValue * taxInfo.rate) / 100;
+};
+
 export default function CitizenDashboard() {
   const [parcels, setParcels] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -57,6 +77,7 @@ export default function CitizenDashboard() {
 
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('ALL');
+  const [filterCategory, setFilterCategory] = useState('ALL');
   const [selectedParcel, setSelectedParcel] = useState(null);
 
   const [isUploadingPdf, setIsUploadingPdf] = useState(false);
@@ -75,7 +96,6 @@ export default function CitizenDashboard() {
     try {
       const response = await getMyLands();
 
-      // Safely unwrap Axios or direct API response
       const payload = response?.data || response;
       const landsArray = payload?.lands || (Array.isArray(payload) ? payload : []);
 
@@ -88,20 +108,21 @@ export default function CitizenDashboard() {
       }
 
       const normalized = landsArray.map((land, idx) => {
-        // Extract GeoJSON coordinates if available ([ [ [lng, lat], ... ] ])
         let parsedCoords = [];
         if (land.boundaryLocation?.coordinates?.[0]?.length > 0) {
-          // Map GeoJSON [longitude, latitude] to Leaflet standard [latitude, longitude]
           parsedCoords = land.boundaryLocation.coordinates[0].map(([lng, lat]) => [lat, lng]);
         } else {
-          // Fallback bounding box around Tarakeshwar Ward-5
           parsedCoords = [
             [27.7650, 85.3020],
             [27.7655, 85.3028],
-            [27.7648, 85.3035],
+            [27.7658, 85.3035],
             [27.7642, 85.3025],
           ];
         }
+
+        const category = land.category || 'Agricultural';
+        const taxInfo = getTaxInfo(category);
+        const taxAmount = calculateTax(category, land.CurrentBookValue || 0);
 
         return {
           id: land._id || `land-${land.landId || idx}`,
@@ -114,7 +135,11 @@ export default function CitizenDashboard() {
           district: land.district || 'Tarakeshwar',
           municipality: land.municipality || 'Tarakeshwar Municipality',
           wardNo: land.wardNo || 5,
-          category: land.category || 'Agricultural',
+          category: category,
+          categoryLabel: taxInfo.label,
+          taxRate: taxInfo.rate,
+          taxAmount: taxAmount,
+          taxColor: taxInfo.color,
           areaSqm: land.areaInSqMeters || 0,
           currentBookValue: land.CurrentBookValue || 0,
           buyingPrice: land.buyngPrice || 0,
@@ -176,6 +201,12 @@ export default function CitizenDashboard() {
     }
   };
 
+  // Get unique categories for filter
+  const uniqueCategories = useMemo(() => {
+    const cats = new Set(parcels.map(p => p.category));
+    return ['ALL', ...Array.from(cats)];
+  }, [parcels]);
+
   // Deep Search across all plot attributes
   const filteredParcels = useMemo(() => {
     const query = searchTerm.trim().toLowerCase();
@@ -196,9 +227,12 @@ export default function CitizenDashboard() {
       const matchesStatus =
         filterStatus === 'ALL' || p.status.toUpperCase().includes(filterStatus.toUpperCase());
 
-      return matchesSearch && matchesStatus;
+      const matchesCategory =
+        filterCategory === 'ALL' || p.category === filterCategory;
+
+      return matchesSearch && matchesStatus && matchesCategory;
     });
-  }, [parcels, searchTerm, filterStatus]);
+  }, [parcels, searchTerm, filterStatus, filterCategory]);
 
   // Sync selected parcel when searching
   useEffect(() => {
@@ -214,17 +248,19 @@ export default function CitizenDashboard() {
   const handleResetFilters = () => {
     setSearchTerm('');
     setFilterStatus('ALL');
+    setFilterCategory('ALL');
     fetchCitizenLands();
   };
 
   const totalAreaSqm = parcels.reduce((sum, p) => sum + (p.areaSqm || 0), 0);
+  const totalTaxAmount = parcels.reduce((sum, p) => sum + (p.taxAmount || 0), 0);
 
   return (
     <div className={styles.dashboardContainer}>
       {/* Header */}
       <header className={styles.header}>
         <div>
-          <h1 className={styles.headerTitle}>🏡 Citizen Land Portal</h1>
+          <h1 className={styles.headerTitle}>Citizen Land Portal</h1>
           <p className={styles.headerSubtitle}>
             Inspect owned lands, perform citizenship lookups, and verify Lalpurja records.
           </p>
@@ -274,13 +310,39 @@ export default function CitizenDashboard() {
           </div>
         </div>
         <div className={styles.statCard}>
-          <div className={styles.statLabel}>Pending Actions</div>
+          <div className={styles.statLabel}>Annual Tax Liability</div>
           <div className={`${styles.statValue} ${styles.statValueWarning}`}>
-            {parcels.filter((p) => p.status === 'Transfer Pending').length}
+            NPR {totalTaxAmount.toLocaleString()}
           </div>
         </div>
       </div>
+      
       <div className={styles.controlsBar}>
+        <input
+          type="text"
+          placeholder="Search by Plot, Kitta, Lalpurja, Location..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          className={styles.searchInput}
+        />
+        <select
+          value={filterStatus}
+          onChange={(e) => setFilterStatus(e.target.value)}
+          className={styles.statusSelect}
+        >
+          <option value="ALL">All Status</option>
+          <option value="Verified">Verified</option>
+          <option value="Restricted">Restricted</option>
+        </select>
+        <select
+          value={filterCategory}
+          onChange={(e) => setFilterCategory(e.target.value)}
+          className={styles.categorySelect}
+        >
+          {uniqueCategories.map(cat => (
+            <option key={cat} value={cat}>{cat === 'ALL' ? 'All Categories' : cat}</option>
+          ))}
+        </select>
         <button onClick={handleResetFilters} className={styles.secondaryBtn}>
           Reset
         </button>
@@ -300,13 +362,14 @@ export default function CitizenDashboard() {
               <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
               {filteredParcels.map((parcel) => {
                 const isSelected = selectedParcel?.id === parcel.id;
+                const taxInfo = getTaxInfo(parcel.category);
                 return (
                   <Polygon
                     key={parcel.id}
                     positions={parcel.coordinates}
                     pathOptions={{
-                      color: isSelected ? '#ef5461' : '#3b82f6',
-                      fillColor: isSelected ? '#ef5461' : '#3b82f6',
+                      color: isSelected ? '#ef5461' : taxInfo.color,
+                      fillColor: isSelected ? '#ef5461' : taxInfo.color,
                       fillOpacity: isSelected ? 0.5 : 0.25,
                       weight: isSelected ? 3 : 2,
                     }}
@@ -321,6 +384,10 @@ export default function CitizenDashboard() {
                         Owner: {parcel.ownerName}
                         <br />
                         Area: {sqmToRopani(parcel.areaSqm)}
+                        <br />
+                        <span style={{ color: taxInfo.color, fontWeight: 600 }}>
+                          Tax: {taxInfo.rate}% (NPR {parcel.taxAmount.toLocaleString()})
+                        </span>
                       </div>
                     </Popup>
                   </Polygon>
@@ -348,6 +415,34 @@ export default function CitizenDashboard() {
                 <div><strong>Location:</strong> {selectedParcel.municipality}, Ward {selectedParcel.wardNo}, {selectedParcel.district}</div>
                 <div><strong>Area:</strong> {sqmToRopani(selectedParcel.areaSqm)} ({selectedParcel.areaSqm} m²)</div>
                 <div><strong>Book Value:</strong> NPR {selectedParcel.currentBookValue.toLocaleString()}</div>
+                
+                {/* Tax Information Section */}
+                <div className={styles.taxSection}>
+                  <div className={styles.taxHeader}>
+                    <strong>Tax Information</strong>
+                  </div>
+                  <div className={styles.taxDetails}>
+                    <div>
+                      <span className={styles.taxLabel}>Tax Rate:</span>
+                      <span className={styles.taxRate} style={{ color: selectedParcel.taxColor }}>
+                        {selectedParcel.taxRate}%
+                      </span>
+                    </div>
+                    <div>
+                      <span className={styles.taxLabel}>Annual Tax:</span>
+                      <span className={styles.taxAmount}>
+                        NPR {selectedParcel.taxAmount.toLocaleString()}
+                      </span>
+                    </div>
+                    <div>
+                      <span className={styles.taxLabel}>Category:</span>
+                      <span className={styles.taxCategory}>
+                        {selectedParcel.categoryLabel}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
                 <div className={styles.txHash}>Tx: {selectedParcel.blockchainTxHash}</div>
               </div>
             </div>
@@ -380,10 +475,15 @@ export default function CitizenDashboard() {
                     >
                       <div className={styles.landItemHeader}>
                         <span>Plot #{parcel.plotNumber}</span>
-                        <span>Kitta #{parcel.kittaNumber}</span>
+                        <span className={styles.landItemTax} style={{ color: parcel.taxColor }}>
+                          {parcel.taxRate}%
+                        </span>
                       </div>
                       <div className={styles.landItemSub}>
                         {parcel.municipality} • {parcel.areaSqm} m² ({sqmToRopani(parcel.areaSqm)})
+                      </div>
+                      <div className={styles.landItemCategory}>
+                        {parcel.category} • Tax: NPR {parcel.taxAmount.toLocaleString()}
                       </div>
                     </div>
                   );

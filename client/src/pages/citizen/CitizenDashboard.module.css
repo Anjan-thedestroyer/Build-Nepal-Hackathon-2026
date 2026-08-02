@@ -1,327 +1,604 @@
-/* Container & Layout */
+/* CitizenDashboard.module.css */
+
+/* Base Container */
 .dashboardContainer {
-  padding: 24px;
   max-width: 1400px;
   margin: 0 auto;
-  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  color: #f3f4f6;
-  background-color: #0b0f17;
-  min-height: 100vh;
+  padding: 1.5rem;
+  background: #ffffff;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+  color: #1a1a2e;
 }
 
-/* Header Section */
+/* Header Styles */
 .header {
-  margin-bottom: 24px;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  flex-wrap: wrap;
-  gap: 16px;
+  padding: 1.5rem 2rem;
+  background: #ffffff;
+  border-radius: 16px;
+  border: 1px solid #e8ecf1;
+  margin-bottom: 1.5rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
 }
 
 .headerTitle {
   font-size: 1.75rem;
-  font-weight: 700;
-  margin: 0 0 4px 0;
-  color: #ffffff;
+  font-weight: 600;
+  color: #1a1a2e;
+  margin: 0 0 0.25rem 0;
+  letter-spacing: -0.01em;
 }
 
 .headerSubtitle {
-  color: #9ca3af;
-  margin: 0;
+  color: #64748b;
   font-size: 0.95rem;
+  margin: 0;
+  font-weight: 400;
 }
 
 .scanBtn {
-  padding: 10px 18px;
-  background-color: #ef5461;
-  color: #ffffff;
+  background: #1a1a2e;
+  color: white;
   border: none;
-  border-radius: 6px;
+  padding: 0.75rem 1.5rem;
+  border-radius: 10px;
+  font-weight: 500;
+  font-size: 0.95rem;
   cursor: pointer;
-  font-weight: 600;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  transition: background-color 0.2s ease, transform 0.1s ease;
+  transition: all 0.2s ease;
+  white-space: nowrap;
 }
 
 .scanBtn:hover:not(:disabled) {
-  background-color: #d94350;
+  background: #2d2d44;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(26, 26, 46, 0.15);
 }
 
 .scanBtn:disabled {
-  opacity: 0.7;
+  opacity: 0.6;
   cursor: not-allowed;
 }
 
-/* Alert Notifications */
+/* Alert Styles */
 .alert {
-  padding: 12px 16px;
-  border-radius: 6px;
-  margin-bottom: 16px;
-  font-size: 0.9rem;
+  padding: 1rem 1.5rem;
+  border-radius: 12px;
+  margin-bottom: 1.25rem;
+  font-size: 0.95rem;
+  border: 1px solid;
 }
 
 .alertSuccess {
-  background-color: rgba(16, 185, 129, 0.15);
-  border-left: 4px solid #10b981;
-  color: #34d399;
+  background: #f0fdf4;
+  border-color: #bbf7d0;
+  color: #166534;
 }
 
 .alertError {
-  background-color: rgba(239, 68, 68, 0.15);
-  border-left: 4px solid #ef4444;
-  color: #f87171;
+  background: #fef2f2;
+  border-color: #fecaca;
+  color: #991b1b;
 }
 
-/* Summary Cards Grid */
+/* Stats Grid */
 .statsGrid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 16px;
-  margin-bottom: 24px;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 1rem;
+  margin-bottom: 1.5rem;
 }
 
 .statCard {
-  padding: 16px;
-  background-color: #111827;
-  border: 1px solid #1f2937;
-  border-radius: 8px;
+  background: #ffffff;
+  border: 1px solid #e8ecf1;
+  border-radius: 12px;
+  padding: 1.25rem 1.5rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+  transition: border-color 0.2s;
+}
+
+.statCard:hover {
+  border-color: #cbd5e1;
 }
 
 .statLabel {
   font-size: 0.85rem;
-  color: #9ca3af;
-  margin-bottom: 4px;
+  font-weight: 500;
+  color: #64748b;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  margin-bottom: 0.4rem;
 }
 
 .statValue {
   font-size: 1.5rem;
-  font-weight: 700;
-  color: #ffffff;
+  font-weight: 600;
+  color: #1a1a2e;
 }
 
 .statValueSuccess {
-  color: #10b981;
+  color: #0b6e4f;
 }
 
 .statValueWarning {
-  color: #f59e0b;
+  color: #b45309;
 }
 
-/* Filter & Controls Bar */
+/* Controls Bar */
 .controlsBar {
   display: flex;
-  gap: 12px;
+  gap: 0.75rem;
+  align-items: center;
+  margin-bottom: 1.5rem;
   flex-wrap: wrap;
-  margin-bottom: 24px;
-}
-
-.inputField,
-.selectField {
-  padding: 10px 14px;
-  border-radius: 6px;
-  border: 1px solid #374151;
-  background-color: #1f2937;
-  color: #ffffff;
-  outline: none;
-  font-size: 0.9rem;
-}
-
-.inputField:focus,
-.selectField:focus {
-  border-color: #ef5461;
 }
 
 .searchInput {
-  flex: 1 1 280px;
-}
-
-.lookupForm {
-  display: flex;
-  gap: 8px;
-  flex: 1 1 320px;
-}
-
-.lookupInput {
   flex: 1;
+  min-width: 200px;
+  padding: 0.6rem 1rem;
+  border: 1px solid #d1d5db;
+  border-radius: 10px;
+  font-size: 0.95rem;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  background: #ffffff;
 }
 
-.primaryBtn {
-  padding: 10px 16px;
-  background-color: #3b82f6;
-  color: #ffffff;
-  border: none;
-  border-radius: 6px;
+.searchInput:focus {
+  outline: none;
+  border-color: #1a1a2e;
+  box-shadow: 0 0 0 3px rgba(26, 26, 46, 0.08);
+}
+
+.statusSelect {
+  padding: 0.6rem 1rem;
+  border: 1px solid #d1d5db;
+  border-radius: 10px;
+  font-size: 0.95rem;
+  background: #ffffff;
+  color: #1a1a2e;
   cursor: pointer;
-  font-weight: 600;
-  transition: background-color 0.2s ease;
+  min-width: 120px;
 }
 
-.primaryBtn:hover:not(:disabled) {
-  background-color: #2563eb;
+.statusSelect:focus {
+  outline: none;
+  border-color: #1a1a2e;
+  box-shadow: 0 0 0 3px rgba(26, 26, 46, 0.08);
 }
 
 .secondaryBtn {
-  padding: 10px 14px;
-  background-color: #374151;
-  color: #ffffff;
-  border: none;
-  border-radius: 6px;
-  cursor: pointer;
+  background: #f1f5f9;
+  color: #1e293b;
+  border: 1px solid #e2e8f0;
+  padding: 0.6rem 1.25rem;
+  border-radius: 10px;
   font-weight: 500;
-  transition: background-color 0.2s ease;
+  font-size: 0.95rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
 }
 
 .secondaryBtn:hover {
-  background-color: #4b5563;
+  background: #e2e8f0;
+  border-color: #cbd5e1;
 }
 
-/* Main Dashboard Content Layout */
+/* Main Layout: Map + Sidebar */
 .mainLayout {
   display: grid;
   grid-template-columns: 1fr 380px;
-  gap: 24px;
+  gap: 1.5rem;
+  height: calc(100vh - 320px);
+  min-height: 500px;
 }
 
-@media (max-width: 1024px) {
-  .mainLayout {
-    grid-template-columns: 1fr;
-  }
-}
-
-/* Map Container */
+/* Map Wrapper */
 .mapWrapper {
-  height: 600px;
-  border-radius: 8px;
+  background: #f8fafc;
+  border-radius: 16px;
   overflow: hidden;
-  border: 1px solid #374151;
-  background-color: #111827;
+  border: 1px solid #e8ecf1;
+  position: relative;
+  height: 100%;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
 }
 
 .mapLoader {
-  height: 100%;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #9ca3af;
+  height: 100%;
+  color: #64748b;
+  font-size: 1rem;
+  background: #f8fafc;
 }
 
-/* Sidebar Details Panel */
+/* Sidebar Panel */
 .sidebarPanel {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 1rem;
+  height: 100%;
+  overflow: hidden;
 }
 
+/* Detail Card */
 .detailCard {
-  padding: 18px;
-  background-color: #111827;
-  border: 1px solid #374151;
-  border-radius: 8px;
+  background: #ffffff;
+  border: 1px solid #e8ecf1;
+  border-radius: 16px;
+  padding: 1.25rem 1.5rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+  flex-shrink: 0;
+}
+
+.emptySelection {
+  color: #64748b;
+  font-size: 0.95rem;
+  text-align: center;
+  padding: 2rem 1.5rem;
 }
 
 .cardHeader {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 4px;
+  margin-bottom: 0.5rem;
+  flex-wrap: wrap;
+  gap: 0.5rem;
 }
 
 .cardTitle {
+  font-size: 1.15rem;
+  font-weight: 600;
+  color: #1a1a2e;
   margin: 0;
-  color: #ef5461;
-  font-size: 1.2rem;
 }
 
 .statusBadge {
+  background: #dcfce7;
+  color: #166534;
   font-size: 0.75rem;
-  padding: 2px 8px;
-  border-radius: 10px;
-  background-color: rgba(16, 185, 129, 0.15);
-  color: #10b981;
-  font-weight: 600;
+  font-weight: 500;
+  padding: 0.25rem 0.75rem;
+  border-radius: 20px;
+  border: 1px solid #bbf7d0;
+  white-space: nowrap;
 }
 
 .kittaText {
-  font-size: 0.85rem;
-  color: #9ca3af;
-  margin-bottom: 12px;
+  font-size: 0.9rem;
+  color: #475569;
+  margin-bottom: 0.75rem;
 }
 
 .infoGrid {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  font-size: 0.875rem;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.5rem;
+  font-size: 0.9rem;
+  color: #1e293b;
+}
+
+.infoGrid div {
+  padding: 0.3rem 0;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.infoGrid div:last-child {
+  border-bottom: none;
 }
 
 .txHash {
-  font-family: monospace;
-  font-size: 0.75rem;
-  color: #6b7280;
+  font-family: 'Monaco', 'Menlo', 'Consolas', monospace;
+  font-size: 0.8rem;
+  color: #475569;
   word-break: break-all;
-  margin-top: 4px;
+  background: #f8fafc;
+  padding: 0.3rem 0.6rem;
+  border-radius: 6px;
 }
 
-/* List of Lands */
+/* List Card */
 .listCard {
+  background: #ffffff;
+  border: 1px solid #e8ecf1;
+  border-radius: 16px;
+  padding: 1rem 1.25rem 1.25rem 1.25rem;
   flex: 1;
-  max-height: 300px;
-  overflow-y: auto;
-  background-color: #111827;
-  border: 1px solid #374151;
-  border-radius: 8px;
-  padding: 14px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
 }
 
 .listTitle {
-  margin: 0 0 10px 0;
-  font-size: 0.9rem;
-  color: #9ca3af;
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: #64748b;
+  margin: 0 0 0.75rem 0;
   text-transform: uppercase;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.03em;
+  flex-shrink: 0;
 }
 
 .landItemsGroup {
+  flex: 1;
+  overflow-y: auto;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 0.4rem;
+  padding-right: 0.25rem;
+}
+
+.landItemsGroup::-webkit-scrollbar {
+  width: 5px;
+}
+
+.landItemsGroup::-webkit-scrollbar-track {
+  background: #f1f5f9;
+  border-radius: 10px;
+}
+
+.landItemsGroup::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 10px;
 }
 
 .landItem {
-  padding: 10px 12px;
-  border-radius: 6px;
-  background-color: #0b0f17;
-  border: 1px solid #1f2937;
+  padding: 0.65rem 0.9rem;
+  border-radius: 10px;
+  background: #f8fafc;
+  border: 1px solid transparent;
   cursor: pointer;
-  transition: border-color 0.15s ease, background-color 0.15s ease;
+  transition: all 0.15s ease;
 }
 
 .landItem:hover {
-  border-color: #374151;
+  background: #f1f5f9;
 }
 
 .activeLandItem {
-  background-color: #1f2937;
-  border-color: #ef5461;
+  background: #f1f5f9;
+  border-color: #1a1a2e;
 }
 
 .landItemHeader {
   display: flex;
   justify-content: space-between;
-  font-weight: 600;
-  margin-bottom: 2px;
+  align-items: center;
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: #1a1a2e;
 }
 
 .landItemSub {
-  font-size: 0.75rem;
-  color: #9ca3af;
+  font-size: 0.8rem;
+  color: #64748b;
+  margin-top: 0.15rem;
 }
 
-.emptySelection {
-  padding: 24px;
-  text-align: center;
-  color: #9ca3af;
+/* Responsive Design */
+@media (max-width: 1024px) {
+  .mainLayout {
+    grid-template-columns: 1fr;
+    height: auto;
+    min-height: 600px;
+  }
+
+  .mapWrapper {
+    height: 400px;
+  }
+
+  .sidebarPanel {
+    height: auto;
+    max-height: 600px;
+  }
+
+  .listCard {
+    max-height: 300px;
+  }
+}
+
+@media (max-width: 640px) {
+  .dashboardContainer {
+    padding: 0.75rem;
+  }
+
+  .header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 1rem;
+    padding: 1rem 1.25rem;
+  }
+
+  .headerTitle {
+    font-size: 1.3rem;
+  }
+
+  .scanBtn {
+    text-align: center;
+    width: 100%;
+  }
+
+  .statsGrid {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .mainLayout {
+    min-height: 500px;
+  }
+
+  .mapWrapper {
+    height: 300px;
+  }
+
+  .detailCard {
+    padding: 1rem;
+  }
+
+  .listCard {
+    padding: 0.75rem 1rem;
+  }
+}
+
+@media (max-width: 420px) {
+  .statsGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .controlsBar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .searchInput,
+  .statusSelect,
+  .secondaryBtn {
+    width: 100%;
+  }
+}
+/* Add these new styles to your existing CSS */
+
+/* Search and Filter Controls */
+.searchInput {
+  flex: 1;
+  min-width: 200px;
+  padding: 0.6rem 1rem;
+  border: 1px solid #d1d5db;
+  border-radius: 10px;
+  font-size: 0.95rem;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  background: #ffffff;
+  outline: none;
+}
+
+.searchInput:focus {
+  border-color: #1a1a2e;
+  box-shadow: 0 0 0 3px rgba(26, 26, 46, 0.08);
+}
+
+.categorySelect {
+  padding: 0.6rem 1rem;
+  border: 1px solid #d1d5db;
+  border-radius: 10px;
+  font-size: 0.95rem;
+  background: #ffffff;
+  color: #1a1a2e;
+  cursor: pointer;
+  min-width: 150px;
+  outline: none;
+}
+
+.categorySelect:focus {
+  border-color: #1a1a2e;
+  box-shadow: 0 0 0 3px rgba(26, 26, 46, 0.08);
+}
+
+/* Stats Grid - Updated */
+.statsGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.statValueWarning {
+  color: #b45309;
+}
+
+/* Tax Section in Detail Card */
+.taxSection {
+  margin-top: 0.5rem;
+  padding: 0.75rem;
+  background: #f8fafc;
+  border-radius: 8px;
+  border: 1px solid #e8ecf1;
+}
+
+.taxHeader {
+  font-size: 0.85rem;
+  color: #475569;
+  margin-bottom: 0.5rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.taxDetails {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.3rem;
+  font-size: 0.9rem;
+}
+
+.taxDetails div {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.15rem 0;
+}
+
+.taxLabel {
+  color: #64748b;
+  font-weight: 500;
+}
+
+.taxRate {
+  font-weight: 600;
+  font-size: 1rem;
+}
+
+.taxAmount {
+  font-weight: 600;
+  color: #1a1a2e;
+}
+
+.taxCategory {
+  font-weight: 500;
+  color: #475569;
+}
+
+/* Land Item Tax Badge */
+.landItemTax {
+  font-weight: 600;
+  font-size: 0.8rem;
+  padding: 0.15rem 0.5rem;
+  border-radius: 12px;
+  background: #f1f5f9;
+}
+
+.landItemCategory {
+  font-size: 0.75rem;
+  color: #64748b;
+  margin-top: 0.15rem;
+}
+
+/* Responsive updates */
+@media (max-width: 640px) {
+  .controlsBar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .searchInput,
+  .statusSelect,
+  .categorySelect,
+  .secondaryBtn {
+    width: 100%;
+  }
+
+  .statsGrid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (max-width: 420px) {
+  .statsGrid {
+    grid-template-columns: 1fr;
+  }
 }

@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { useAuthStore } from "../../store/useAuthStore";
 import { logoutUser } from "../../api/auth.api";
@@ -8,6 +8,22 @@ export const Navbar = () => {
   const { user, token, logout } = useAuthStore();
   const navigate = useNavigate();
   const location = useLocation();
+  const [taxInfo, setTaxInfo] = useState(null);
+
+  useEffect(() => {
+    // Get tax information based on user's land category
+    if (user?.landCategory) {
+      const taxRates = {
+        'Agricultural': { rate: 10, label: 'Agricultural Land Tax' },
+        'Residential': { rate: 5, label: 'Residential Land Tax' },
+        'Commercial': { rate: 15, label: 'Commercial Land Tax' },
+        'Industrial': { rate: 12, label: 'Industrial Land Tax' },
+        'Forest/Conservation': { rate: 2, label: 'Conservation Land Tax' },
+        'Public/Government': { rate: 0, label: 'Government Land (Exempt)' },
+      };
+      setTaxInfo(taxRates[user.landCategory] || taxRates['Residential']);
+    }
+  }, [user]);
 
   const handleLogout = async () => {
     try {
@@ -30,8 +46,11 @@ export const Navbar = () => {
     <header className="navbar">
       {/* Brand Logo & Portal Tag */}
       <Link to="/" className="navbar__brand">
-        <i>🏛️</i>
-        <span>DMalpot</span>
+        <img 
+          src="/gemini-svg.svg" 
+          alt="DMalpot Logo" 
+          className="navbar__logo"
+        />
         <span className="navbar__badge">
           {isOfficer ? "Officer Portal" : "Digital Cadastral"}
         </span>
@@ -39,9 +58,6 @@ export const Navbar = () => {
 
       {/* Navigation Links */}
       <nav className="navbar__links">
-        <Link to="/" className={`navbar__link ${activeClass("/")}`}>
-          Public GIS Search
-        </Link>
 
         {token && isCitizen && (
           <Link
@@ -65,28 +81,31 @@ export const Navbar = () => {
       {/* Auth Actions & User Badge */}
       <div className="navbar__actions">
         {token && user ? (
-          <div className="row" style={{ gap: "var(--space-md)" }}>
-            <div style={{ textAlign: "right", lineHeight: "1.2" }}>
-              <div
-                style={{
-                  fontSize: "var(--fs-sm)",
-                  fontWeight: "600",
-                  color: "var(--color-text-primary)",
-                }}
-              >
-                {user.fullName || user.email}
+          <div className="navbar__user-container">
+            {/* Tax Information */}
+            {taxInfo && user.landCategory && (
+              <div className="navbar__tax-info">
+                <span className="navbar__tax-label">{taxInfo.label}:</span>
+                <span className={`navbar__tax-rate ${taxInfo.rate > 0 ? 'tax-rate--active' : 'tax-rate--exempt'}`}>
+                  {taxInfo.rate}%
+                </span>
               </div>
-              <div
-                style={{
-                  fontSize: "var(--fs-xs)",
-                  color: "var(--color-text-muted)",
-                  textTransform: "uppercase",
-                  letterSpacing: "0.05em",
-                }}
-              >
-                {user.role}
+            )}
+            
+            <div className="navbar__user">
+              <div className="navbar__user-avatar">
+                {user.fullName?.charAt(0) || user.email?.charAt(0) || 'U'}
+              </div>
+              <div className="navbar__user-info">
+                <div className="navbar__user-name">
+                  {user.fullName || user.email}
+                </div>
+                <div className="navbar__user-role">
+                  {user.role} {user.landCategory && `• ${user.landCategory}`}
+                </div>
               </div>
             </div>
+
             <button
               onClick={handleLogout}
               className="btn btn--ghost btn--sm"
