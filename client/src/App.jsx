@@ -9,11 +9,15 @@ import CitizenDashboard from "./pages/citizen/CitizenDashboard";
 import Login from "./pages/auth/Login";
 import Register from "./pages/auth/Register";
 import AdminDashboard from "./pages/officer/AdminDashboard";
-
+import {Helmet}
+ from "react-helmet-async";
 
 export default function App() {
   return (
     <>
+      <Helmet>
+        <title> DMalpot</title>
+      </Helmet>
       {/* Global Navigation Bar */}
       <Navbar />
 

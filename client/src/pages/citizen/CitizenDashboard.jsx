@@ -317,36 +317,7 @@ export default function CitizenDashboard() {
         </div>
       </div>
       
-      <div className={styles.controlsBar}>
-        <input
-          type="text"
-          placeholder="Search by Plot, Kitta, Lalpurja, Location..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          className={styles.searchInput}
-        />
-        <select
-          value={filterStatus}
-          onChange={(e) => setFilterStatus(e.target.value)}
-          className={styles.statusSelect}
-        >
-          <option value="ALL">All Status</option>
-          <option value="Verified">Verified</option>
-          <option value="Restricted">Restricted</option>
-        </select>
-        <select
-          value={filterCategory}
-          onChange={(e) => setFilterCategory(e.target.value)}
-          className={styles.categorySelect}
-        >
-          {uniqueCategories.map(cat => (
-            <option key={cat} value={cat}>{cat === 'ALL' ? 'All Categories' : cat}</option>
-          ))}
-        </select>
-        <button onClick={handleResetFilters} className={styles.secondaryBtn}>
-          Reset
-        </button>
-      </div>
+      
 
       {/* Main Layout: Map & Sidebar */}
       <div className={styles.mainLayout}>
