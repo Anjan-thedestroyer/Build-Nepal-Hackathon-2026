@@ -18,6 +18,10 @@ const citizenshipSchema = new mongoose.Schema(
    ref: "User",
    required: true,
   },
+  lalpurja: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "Lalpurja",
+},
  },
  { timestamps: true }
 );

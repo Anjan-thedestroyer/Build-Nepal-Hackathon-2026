@@ -12,7 +12,13 @@ import { parseCadastralData } from "../utils/pdfScanner.js";
 import mongoose from "mongoose";
 import { CitizenshipModel } from "../model/citizenship.model.js";
 
-
+const TAX_RATES = {
+  Residential: 0.01,   // 1%
+  Agricultural: 0.005, // 0.5%
+  Commercial: 0.02,    // 2%
+  Industrial: 0.025,   // 2.5%
+  Government: 0,
+};
 const decodeCoordinatesFromChain = (latitudes, longitudes, scaleFactor = 1e6) => {
     if (!latitudes || !longitudes || latitudes.length !== longitudes.length) {
         return [];
@@ -58,9 +64,35 @@ export const registerLalpurja = async (req, res) => {
 
         const filePath = req.file.path;
 
+        // 1. Extract data from uploaded PDF
         const { extracted } = await parseCadastralData(filePath);
 
-        // 3. Parse optional manual JSON inputs from req.body (handles stringified JSON from Multer form-data)
+        // 2. Resolve Citizenship Numbers from body & PDF
+        const bodyCitizenshipNo = req.body.citizenshipNo ? String(req.body.citizenshipNo).trim() : null;
+        const pdfCitizenshipNo = extracted?.citizenshipNo ? String(extracted.citizenshipNo).trim() : null;
+
+        // Validation A: Ensure at least one citizenship number is present
+        if (!bodyCitizenshipNo && !pdfCitizenshipNo) {
+            if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+            return res.status(400).json({
+                success: false,
+                message: "Citizenship number is required either in request body or within the uploaded PDF.",
+            });
+        }
+
+        // Validation B: If both are present, verify that they match
+        if (bodyCitizenshipNo && pdfCitizenshipNo && bodyCitizenshipNo !== pdfCitizenshipNo) {
+            if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+            return res.status(400).json({
+                success: false,
+                message: `Citizenship number mismatch. Provided in body: "${bodyCitizenshipNo}", but extracted from PDF: "${pdfCitizenshipNo}".`,
+            });
+        }
+
+        // Final validated citizenship number (prioritizing body if both matched or only body exists)
+        const validatedCitizenshipNo = bodyCitizenshipNo || pdfCitizenshipNo;
+
+        // 3. Parse optional manual JSON inputs from req.body
         let parsedCoordinates = req.body.coordinates;
         if (typeof parsedCoordinates === "string") {
             try {
@@ -78,7 +110,7 @@ export const registerLalpurja = async (req, res) => {
         const areaInSqMeters = req.body.areaInSqMeters ? Number(req.body.areaInSqMeters) : extracted.areaInSqMeters;
         const lalpurjaNo = req.body.lalpurjaNo || extracted.lalpurjaNo;
         const rawCategory = req.body.category !== undefined ? req.body.category : extracted.category;
-        const citizenshipNo = req.body.citizenshipNo || extracted.citizenshipNo;
+
         const buyngPrice = req.body.buyngPrice
             ? Number(req.body.buyngPrice)
             : extracted.buyngPrice;
@@ -95,7 +127,7 @@ export const registerLalpurja = async (req, res) => {
             ? parsedCoordinates
             : extracted.coordinates;
 
-        // --- OPTION 1 FIX: Safely map category to Mongoose String Enum ---
+        // Map category to Mongoose String Enum
         let categoryString;
         if (typeof rawCategory === "number" || (!isNaN(Number(rawCategory)) && rawCategory !== "")) {
             const idx = Number(rawCategory);
@@ -124,42 +156,19 @@ export const registerLalpurja = async (req, res) => {
             });
         }
 
-        // 6. Resolve Owner User
-        let ownerUser = null;
+        // 6. Strict Owner User Resolution ONLY via validatedCitizenshipNo
+        const citizenshipDoc = await CitizenshipModel.findOne({ citizenshipNo: validatedCitizenshipNo }).populate("user");
 
-        // Priority A: Check manually provided ownerIds
-        if (req.body.ownerIds) {
-            const ownerId = Array.isArray(req.body.ownerIds) ? req.body.ownerIds[0] : req.body.ownerIds;
-            ownerUser = await UserModel.findById(ownerId).populate("citizenship");
-        }
-
-        // Priority B: Check Citizenship number from request body or PDF scan
-        if (!ownerUser && citizenshipNo) {
-            const citizenshipDoc = await CitizenshipModel.findOne({ citizenshipNo }).populate("user");
-            if (citizenshipDoc && citizenshipDoc.user) {
-                ownerUser = citizenshipDoc.user;
-            }
-        }
-
-        // Priority C: Logged in user fallback
-        if (!ownerUser && req.user) {
-            ownerUser = await UserModel.findById(req.user._id || req.user.id).populate("citizenship");
-        }
-
-        if (!ownerUser) {
+        if (!citizenshipDoc || !citizenshipDoc.user) {
             if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
             return res.status(404).json({
                 success: false,
-                message: `No user found matching Citizenship No: ${citizenshipNo || "N/A"}. Please register user first.`,
+                message: `No user account found matching Citizenship No: ${validatedCitizenshipNo}. Registration failed.`,
             });
         }
 
-        const resolvedCitizenshipNo =
-            citizenshipNo ||
-            ownerUser.citizenship?.citizenshipNo ||
-            "UNKNOWN-CITIZENSHIP";
-
-        const citizenshipNumbers = [resolvedCitizenshipNo];
+        const ownerUser = citizenshipDoc.user;
+        const citizenshipNumbers = [validatedCitizenshipNo];
         const ownerIds = [ownerUser._id];
 
         console.log("Values to register on-chain:", {
@@ -172,8 +181,9 @@ export const registerLalpurja = async (req, res) => {
             CurrentBookValue,
             taxRate,
             category: categoryString,
+            citizenshipNo: validatedCitizenshipNo,
             coordinates,
-            });
+        });
 
         // 7. Execute On-Chain Smart Contract Registration
         const txResult = await addLandOnChain(
@@ -184,7 +194,7 @@ export const registerLalpurja = async (req, res) => {
                 municipality,
                 wardNo,
                 kittaNo,
-                category: categoryString, // web3service handles converting this back to uint enum
+                category: categoryString,
                 areaInSqMeters,
                 citizenshipNumbers,
                 coordinates,
@@ -192,12 +202,12 @@ export const registerLalpurja = async (req, res) => {
             filePath
         );
 
-        // 8. Save Record to MongoDB (categoryString matches Mongoose Schema enum)
+        // 8. Save Record to MongoDB
         const newLand = new LalpurjaModel({
             landId,
             lalpurjaNo,
             lalpurjaDocumentPath: filePath,
-            documentHash: txResult.documentHash,   // <-- Add this
+            documentHash: txResult.documentHash,
             buyngPrice,
             CurrentBookValue,
             taxRate,
@@ -219,7 +229,7 @@ export const registerLalpurja = async (req, res) => {
 
             onChainTxHash: txResult.txHash,
             isFrozen: false,
-            });
+        });
 
         await newLand.save();
 
@@ -231,18 +241,18 @@ export const registerLalpurja = async (req, res) => {
         return res.status(201).json({
             success: true,
             message: "Lalpurja registered successfully on Blockchain & DB.",
-           data: {
-            landId,
-            lalpurjaNo,
-            kittaNo,
-            district,
-            wardNo,
-            areaInSqMeters,
-            buyngPrice,
-            CurrentBookValue,
-            taxRate,
-            citizenshipNo: resolvedCitizenshipNo,
-            coordinatesCount: coordinates ? coordinates.length : 0,
+            data: {
+                landId,
+                lalpurjaNo,
+                kittaNo,
+                district,
+                wardNo,
+                areaInSqMeters,
+                buyngPrice,
+                CurrentBookValue,
+                taxRate,
+                citizenshipNo: validatedCitizenshipNo,
+                coordinatesCount: coordinates ? coordinates.length : 0,
             },
             documentHash: txResult.documentHash,
             txHash: txResult.txHash,
@@ -366,95 +376,150 @@ export const getLalpurjaByLandId = async (req, res) => {
 };
 
 export const transferLalpurja = async (req, res) => {
-    try {
-        const { landId, newOwnerIds, price = 0 } = req.body;
+    // 1. Start Mongoose Session for Atomic Rollback Safety
+    const session = await mongoose.startSession();
+    session.startTransaction();
 
-        // 1. Validate land record existence
-        const land = await LalpurjaModel.findOne({ landId: Number(landId) });
+    try {
+        const { landId, newOwnerIds, price } = req.body;
+
+        // Payload checks
+        if (!landId || !newOwnerIds || !Array.isArray(newOwnerIds) || newOwnerIds.length === 0) {
+            await session.abortTransaction();
+            return res.status(400).json({
+                success: false,
+                message: "Missing required fields: landId, newOwnerIds (array), or price.",
+            });
+        }
+
+        // 2. Fetch Land Record from DB and POPULATE current owners & their citizenship
+        const land = await LalpurjaModel.findOne({ landId: Number(landId) })
+            .populate({
+                path: "owners",
+                populate: { path: "citizenship" }
+            })
+            .session(session);
+
         if (!land) {
+            await session.abortTransaction();
             return res.status(404).json({
                 success: false,
                 message: "Land record not found in database.",
             });
         }
 
-        // 2. Check if land is frozen (Roka)
+        // 3. Check Freeze Status
         if (land.isFrozen) {
+            await session.abortTransaction();
             return res.status(400).json({
                 success: false,
                 message: "Cannot transfer ownership. Land is currently frozen (Roka).",
             });
         }
 
-        // 3. Retrieve new owners' citizenship numbers
-        const newOwners = await UserModel.find({ _id: { $in: newOwnerIds } }).populate("citizenship");
-        if (!newOwners || newOwners.length === 0) {
+        // 4. Extract Seller Citizenship from the populated current owner(s)
+        const currentSeller = land.owners && land.owners.length > 0 ? land.owners[0] : null;
+
+        if (!currentSeller) {
+            await session.abortTransaction();
             return res.status(400).json({
                 success: false,
-                message: "Invalid new owners specified.",
+                message: "Land record has no assigned owners in the database.",
+            });
+        }
+
+        const sellerCitizenship = currentSeller.citizenship?.citizenshipNo || currentSeller.citizenshipNumber;
+
+        if (!sellerCitizenship) {
+            await session.abortTransaction();
+            return res.status(400).json({
+                success: false,
+                message: `Current seller (${currentSeller.fullName || currentSeller._id}) lacks a verified citizenship number.`,
+            });
+        }
+
+        // 5. Retrieve New Owners and Validate Buyer Citizenship Data
+        const newOwners = await UserModel.find({ _id: { $in: newOwnerIds } })
+            .populate("citizenship")
+            .session(session);
+
+        if (!newOwners || newOwners.length !== newOwnerIds.length) {
+            await session.abortTransaction();
+            return res.status(400).json({
+                success: false,
+                message: "One or more new owner accounts could not be found.",
             });
         }
 
         const newCitizenshipNumbers = newOwners.map((owner) => {
             const citizenshipNo = owner.citizenship?.citizenshipNo || owner.citizenshipNumber;
             if (!citizenshipNo) {
-                throw new Error(`Owner '${owner.fullName}' lacks a verified citizenship number.`);
+                throw new Error(`New buyer '${owner.fullName || owner._id}' lacks a verified citizenship number.`);
             }
             return citizenshipNo;
         });
 
-        // 4. Extract single strings for seller and buyer citizenship numbers
-        const sellerCitizenship = Array.isArray(land.citizenshipNumbers) && land.citizenshipNumbers.length > 0
-            ? land.citizenshipNumbers[0]
-            : "UNKNOWN";
-
         const buyerCitizenship = newCitizenshipNumbers[0];
 
         // STEP A: Execute On-Chain Ownership Transfer
-        // Returns { requestId, txHash }
+        // Parameters: (landId, sellerCitizenship, buyerCitizenship, price)
         const txResult = await transferLandOnChain(
             Number(landId),
             sellerCitizenship,
             buyerCitizenship,
-            Number(price)
+            price
         );
 
-        // Ensure we extract string hash cleanly
         const extractedTxHash = typeof txResult === "object" && txResult.txHash
             ? txResult.txHash
             : String(txResult);
 
-        // STEP B: Remove Land from previous owners in MongoDB
+        // STEP B: Remove Land Reference from Previous Owners
         await UserModel.updateMany(
             { lalpurjas: land._id },
-            { $pull: { lalpurjas: land._id } }
+            { $pull: { lalpurjas: land._id } },
+            { session }
         );
 
-        // STEP C: Assign Land to new owners and update MongoDB
+        // STEP C: Assign Land to New Owners and Save
         land.owners = newOwnerIds;
-        land.citizenshipNumbers = newCitizenshipNumbers;
-        land.onChainTxHash = extractedTxHash; // 👈 Assigns pure string, preventing CastError
+        land.onChainTxHash = extractedTxHash;
+        land.buyngPrice = Number(price);
+        
+        // If your Lalpurja model does NOT have citizenshipNumbers array, remove this line:
+        if ('citizenshipNumbers' in land) {
+            land.citizenshipNumbers = newCitizenshipNumbers;
+        }
 
-        await land.save();
+        await land.save({ session });
 
         await UserModel.updateMany(
             { _id: { $in: newOwnerIds } },
-            { $addToSet: { lalpurjas: land._id } }
+            { $addToSet: { lalpurjas: land._id } },
+            { session }
         );
+
+        // Commit Transaction after all operations succeed
+        await session.commitTransaction();
 
         return res.status(200).json({
             success: true,
             message: "Ownership transferred successfully on both Blockchain and Database.",
             txHash: extractedTxHash,
-            requestId: txResult.requestId,
+            requestId: txResult?.requestId,
             land,
         });
+
     } catch (error) {
+        await session.abortTransaction();
         console.error("Error transferring ownership:", error);
+
         return res.status(500).json({
             success: false,
-            message: error.message,
+            message: error.message || "An unexpected error occurred during transfer.",
         });
+    } finally {
+        session.endSession();
     }
 };
 
@@ -579,4 +644,143 @@ export const getLandByWard = async (req, res) => {
             message: `Failed to fetch land records by ward: ${error.message}`,
         });
     }
+};
+export const updateBookValue = async (req, res) => {
+  try {
+    const { landId, currentBookValue, taxRate } = req.body;
+
+    if (!landId) {
+      return res.status(400).json({
+        success: false,
+        message: "landId is required.",
+      });
+    }
+
+    const land = await LalpurjaModel.findOne({ landId: Number(landId) });
+
+    if (!land) {
+      return res.status(404).json({
+        success: false,
+        message: "Land not found.",
+      });
+    }
+
+    if (currentBookValue !== undefined) {
+      land.CurrentBookValue = Number(currentBookValue);
+    }
+
+    if (taxRate !== undefined) {
+      land.taxRate = Number(taxRate);
+    }
+
+    await land.save();
+
+    return res.status(200).json({
+      success: true,
+      message: "Book value updated successfully.",
+      land,
+    });
+  } catch (error) {
+    console.error("Update Book Value Error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+export const updateLandType = async (req, res) => {
+  try {
+    const { newLandType, reason, updatedBy, id } = req.body;
+
+    // 1. Validation
+    if (!newLandType) {
+      return res.status(400).json({
+        success: false,
+        message: "Please provide the new land type.",
+      });
+    }
+
+    const validLandTypes = [
+      "Agricultural",
+      "Residential",
+      "Commercial",
+      "Industrial",
+      "Forest/Conservation",
+      "Public/Government",
+    ];
+
+    if (!validLandTypes.includes(newLandType)) {
+      return res.status(400).json({
+        success: false,
+        message: `Invalid land type. Allowed types: ${validLandTypes.join(", ")}`,
+      });
+    }
+
+    // 2. Find Lalpurja record in DB
+    const lalpurja = await LalpurjaModel.findById(id);
+    if (!lalpurja) {
+      return res.status(404).json({
+        success: false,
+        message: "Lalpurja record not found.",
+      });
+    }
+
+    const oldLandType = lalpurja.landType;
+
+    if (oldLandType === newLandType) {
+      return res.status(400).json({
+        success: false,
+        message: `Land type is already set to '${newLandType}'.`,
+      });
+    }
+
+    // 3. Optional: Execute Smart Contract transaction if interacting with Web3/Blockchain
+    let transactionHash = null;
+    if (req.blockchainContract) {
+      const tx = await req.blockchainContract.updateLandCategory(
+        lalpurja.plotId,
+        newLandType
+      );
+      const receipt = await tx.wait();
+      transactionHash = receipt.hash;
+    }
+
+    // 4. Update Database Record
+    lalpurja.landType = newLandType;
+    
+    // Track history audit log inside document if schema supports history
+    if (lalpurja.history) {
+      lalpurja.history.push({
+        action: "LAND_TYPE_CHANGE",
+        from: oldLandType,
+        to: newLandType,
+        reason: reason || "Land type reclassification",
+        updatedBy: updatedBy || req.user?.id,
+        updatedAt: new Date(),
+        txHash: transactionHash,
+      });
+    }
+
+    await lalpurja.save();
+
+    return res.status(200).json({
+      success: true,
+      message: `Land type successfully updated from '${oldLandType}' to '${newLandType}'.`,
+      data: {
+        id: lalpurja._id,
+        plotId: lalpurja.plotId,
+        previousLandType: oldLandType,
+        currentLandType: lalpurja.landType,
+        transactionHash,
+      },
+    });
+  } catch (error) {
+    console.error("Error updating land type:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Server error while updating land type.",
+      error: error.message,
+    });
+  }
 };

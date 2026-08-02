@@ -7,6 +7,8 @@ import cookieParser from "cookie-parser";
 
 import { connect } from "./config/connectDB.js";
 import userRouter from "./route/user.route.js";
+import lalpurjaRouter from "./route/lalpurja.route.js";
+import citizenRouter from "./route/citizen.route.js";
 
 dotenv.config();
 
@@ -27,7 +29,7 @@ app.use(helmet());
 
 app.use(
   cors({
-    origin: process.env.FRONTEND_URL || "http://localhost:3000",
+    origin:"http://localhost:5173",
     credentials: true,
   })
 );
@@ -48,6 +50,8 @@ app.get("/health", (req, res) => {
 
 // API Routes
 app.use("/api/user", userRouter);
+app.use("/api/lalpurja", lalpurjaRouter);
+app.use("/api/citizen", citizenRouter);
 
 app.use((req, res) => {
   res.status(404).json({
