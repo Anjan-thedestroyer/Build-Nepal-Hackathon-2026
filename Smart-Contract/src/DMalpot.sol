@@ -6,20 +6,26 @@ import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol
 
 /**
  * @title DMalpot (Digital Malpot)
- * @notice On-chain land registry and property transfer contract for municipal land administration.
+ * @notice On-chain land registry and property transfer contract for municipal land administration in Nepal.
+ * @dev Optimized for gas efficiency, hash collision safety, and operational reliability.
  */
 contract DMalpot is Ownable, ReentrancyGuard {
-
-    enum LandCategory { Residential, Agricultural, Commercial, Industrial, Government }
+    enum LandCategory {
+        Residential,
+        Agricultural,
+        Commercial,
+        Industrial,
+        Government
+    }
 
     struct Coordinate {
-        int32 latitude; 
-        int32 longitude; 
+        int32 latitude;
+        int32 longitude;
     }
 
     struct CadastralAddress {
         string district;
-        string localGovernment; 
+        string localGovernment;
         uint8 wardNumber;
         uint256 kittaNumber;
     }
@@ -27,7 +33,7 @@ contract DMalpot is Ownable, ReentrancyGuard {
     struct Property {
         uint256 landId;
         string lalpurjaNo;
-        bytes32 documentHash; 
+        bytes32 documentHash;
         CadastralAddress cadastral;
         LandCategory category;
         uint256 areaInSqMeters;
@@ -52,14 +58,18 @@ contract DMalpot is Ownable, ReentrancyGuard {
     error PropertyIsFrozen();
     error SellerDoesNotOwnLand();
     error SameCategoryError();
+    error InvalidBuyer();
+    error SameOwnerTransfer();
+    error InvalidSubdivisionArea();
+    error ZeroAreaNotAllowed();
 
     // Mappings
     mapping(address => bool) public isOfficer;
     mapping(uint256 => Property) public properties;
-    
+
     mapping(bytes32 => bool) private cadastralHashes;
     mapping(bytes32 => bool) private lalpurjaHashes;
-    mapping(bytes32 => bool) public documentHashes; 
+    mapping(bytes32 => bool) public documentHashes;
     mapping(uint256 => Coordinate[]) private landBoundaries;
     mapping(string => uint256[]) private citizenToLandIds;
     mapping(bytes32 => uint256[]) private wardToLandIds;
@@ -79,10 +89,10 @@ contract DMalpot is Ownable, ReentrancyGuard {
     event LandCategoryUpdated(uint256 indexed landId, LandCategory oldCategory, LandCategory newCategory);
     event LandFreezeStatusChanged(uint256 indexed landId, bool isFrozen);
     event PropertyTransferred(
-        uint256 indexed landId, 
-        string sellerCitizenshipNo, 
-        string buyerCitizenshipNo, 
-        uint256 price
+        uint256 indexed landId, string sellerCitizenshipNo, string buyerCitizenshipNo, uint256 price
+    );
+    event LandSubdivided(
+        uint256 indexed parentLandId, uint256 indexed childLandId, uint256 parentRemainingArea, uint256 childArea
     );
 
     modifier onlyOfficer() {
@@ -117,23 +127,93 @@ contract DMalpot is Ownable, ReentrancyGuard {
         string[] memory _citizenshipNumbers,
         int32[] memory _latitudes,
         int32[] memory _longitudes
-    ) public onlyOfficer nonReentrant {
+    ) public nonReentrant onlyOfficer {
+        _registerLandCore(
+            _landId,
+            _lalpurjaNo,
+            _documentHash,
+            _cadastral,
+            _category,
+            _areaInSqMeters,
+            _citizenshipNumbers,
+            _latitudes,
+            _longitudes,
+            0
+        );
+    }
+
+    /**
+     * @notice Subdivide an existing land plot (Kitta Kaat) into a child parcel.
+     * @dev Deducts child area from parent parcel and links child parcel to parentLandId.
+     */
+    function subdivideLand(
+        uint256 _parentLandId,
+        uint256 _childLandId,
+        string memory _childLalpurjaNo,
+        bytes32 _childDocumentHash,
+        uint256 _childKittaNumber,
+        uint256 _childAreaInSqMeters,
+        string[] memory _childCitizenshipNumbers,
+        int32[] memory _childLatitudes,
+        int32[] memory _childLongitudes
+    ) external nonReentrant onlyOfficer landExists(_parentLandId) {
+        Property storage parent = properties[_parentLandId];
+        if (parent.isFrozen) revert PropertyIsFrozen();
+        if (_childAreaInSqMeters == 0) revert ZeroAreaNotAllowed();
+        if (_childAreaInSqMeters >= parent.areaInSqMeters) revert InvalidSubdivisionArea();
+
+        parent.areaInSqMeters -= _childAreaInSqMeters;
+
+        CadastralAddress memory childCadastral = CadastralAddress({
+            district: parent.cadastral.district,
+            localGovernment: parent.cadastral.localGovernment,
+            wardNumber: parent.cadastral.wardNumber,
+            kittaNumber: _childKittaNumber
+        });
+
+        _registerLandCore(
+            _childLandId,
+            _childLalpurjaNo,
+            _childDocumentHash,
+            childCadastral,
+            parent.category,
+            _childAreaInSqMeters,
+            _childCitizenshipNumbers,
+            _childLatitudes,
+            _childLongitudes,
+            _parentLandId
+        );
+
+        emit LandSubdivided(_parentLandId, _childLandId, parent.areaInSqMeters, _childAreaInSqMeters);
+    }
+
+    function _registerLandCore(
+        uint256 _landId,
+        string memory _lalpurjaNo,
+        bytes32 _documentHash,
+        CadastralAddress memory _cadastral,
+        LandCategory _category,
+        uint256 _areaInSqMeters,
+        string[] memory _citizenshipNumbers,
+        int32[] memory _latitudes,
+        int32[] memory _longitudes,
+        uint256 _parentLandId
+    ) internal {
         if (properties[_landId].isRegistered) revert LandAlreadyRegistered();
+        if (_areaInSqMeters == 0) revert ZeroAreaNotAllowed();
         if (_documentHash == bytes32(0)) revert DocumentHashRequired();
         if (documentHashes[_documentHash]) revert DocumentHashExists();
         if (_citizenshipNumbers.length == 0) revert NoOwnersProvided();
         if (_latitudes.length != _longitudes.length) revert LatLongMismatch();
         if (_latitudes.length < 3) revert InvalidPolygonCoordinates();
 
-        bytes32 lalpurjaHashKey = keccak256(abi.encodePacked(_lalpurjaNo));
+        bytes32 lalpurjaHashKey = keccak256(bytes(_lalpurjaNo));
         if (lalpurjaHashes[lalpurjaHashKey]) revert LalpurjaAlreadyExists();
 
-        bytes32 cadastralHashKey = keccak256(abi.encodePacked(
-            _cadastral.district,
-            _cadastral.localGovernment,
-            _cadastral.wardNumber,
-            _cadastral.kittaNumber
-        ));
+        // Use abi.encode instead of abi.encodePacked to prevent dynamic string hash collisions
+        bytes32 cadastralHashKey = keccak256(
+            abi.encode(_cadastral.district, _cadastral.localGovernment, _cadastral.wardNumber, _cadastral.kittaNumber)
+        );
         if (cadastralHashes[cadastralHashKey]) revert KittaAlreadyRegistered();
 
         Property storage land = properties[_landId];
@@ -145,6 +225,7 @@ contract DMalpot is Ownable, ReentrancyGuard {
         land.areaInSqMeters = _areaInSqMeters;
         land.isFrozen = false;
         land.isRegistered = true;
+        land.parentLandId = _parentLandId;
         land.citizenshipNumbers = _citizenshipNumbers;
 
         lalpurjaHashes[lalpurjaHashKey] = true;
@@ -152,17 +233,15 @@ contract DMalpot is Ownable, ReentrancyGuard {
         documentHashes[_documentHash] = true;
 
         for (uint256 i = 0; i < _latitudes.length; i++) {
-            landBoundaries[_landId].push(Coordinate({
-                latitude: _latitudes[i],
-                longitude: _longitudes[i]
-            }));
+            landBoundaries[_landId].push(Coordinate({latitude: _latitudes[i], longitude: _longitudes[i]}));
         }
 
         for (uint256 j = 0; j < _citizenshipNumbers.length; j++) {
             citizenToLandIds[_citizenshipNumbers[j]].push(_landId);
         }
 
-        bytes32 wardKey = keccak256(abi.encodePacked(_cadastral.district, _cadastral.localGovernment, _cadastral.wardNumber));
+        // Use abi.encode to prevent collisions between district and local government strings
+        bytes32 wardKey = keccak256(abi.encode(_cadastral.district, _cadastral.localGovernment, _cadastral.wardNumber));
         wardToLandIds[wardKey].push(_landId);
 
         emit LandRegistered(
@@ -194,20 +273,28 @@ contract DMalpot is Ownable, ReentrancyGuard {
         string memory _sellerCitizenshipNo,
         string memory _buyerCitizenshipNo,
         uint256 _price
-    ) external onlyOfficer landExists(_landId) nonReentrant {
+    ) external nonReentrant onlyOfficer landExists(_landId) {
         Property storage land = properties[_landId];
         if (land.isFrozen) revert PropertyIsFrozen();
+        if (bytes(_buyerCitizenshipNo).length == 0) revert InvalidBuyer();
+
+        bytes32 sellerHash = keccak256(bytes(_sellerCitizenshipNo));
+        bytes32 buyerHash = keccak256(bytes(_buyerCitizenshipNo));
+        if (sellerHash == buyerHash) revert SameOwnerTransfer();
 
         // 1. Validate that the seller actually owns this property
         bool isSellerOwner = false;
-        uint256 ownerIndex = 0;
-        bytes32 sellerHash = keccak256(bytes(_sellerCitizenshipNo));
-        
-        for (uint256 i = 0; i < land.citizenshipNumbers.length; i++) {
-            if (keccak256(bytes(land.citizenshipNumbers[i])) == sellerHash) {
+        bool isBuyerAlreadyOwner = false;
+        uint256 sellerIndex = 0;
+
+        uint256 numOwners = land.citizenshipNumbers.length;
+        for (uint256 i = 0; i < numOwners; i++) {
+            bytes32 currentOwnerHash = keccak256(bytes(land.citizenshipNumbers[i]));
+            if (currentOwnerHash == sellerHash) {
                 isSellerOwner = true;
-                ownerIndex = i;
-                break;
+                sellerIndex = i;
+            } else if (currentOwnerHash == buyerHash) {
+                isBuyerAlreadyOwner = true;
             }
         }
         if (!isSellerOwner) revert SellerDoesNotOwnLand();
@@ -222,17 +309,19 @@ contract DMalpot is Ownable, ReentrancyGuard {
             }
         }
 
-        // 3. Add landId to buyer's citizenToLandIds index
-        citizenToLandIds[_buyerCitizenshipNo].push(_landId);
+        // 3. Update buyer's citizenToLandIds index if not already recorded
+        if (!isBuyerAlreadyOwner) {
+            citizenToLandIds[_buyerCitizenshipNo].push(_landId);
+        }
 
         // 4. Update the land's ownership array
-        // If single ownership, replace directly; if joint, remove the seller and append buyer
-        if (land.citizenshipNumbers.length == 1) {
-            land.citizenshipNumbers[0] = _buyerCitizenshipNo;
-        } else {
-            land.citizenshipNumbers[ownerIndex] = land.citizenshipNumbers[land.citizenshipNumbers.length - 1];
+        if (isBuyerAlreadyOwner) {
+            // Buyer is already a co-owner purchasing seller's share; remove seller
+            land.citizenshipNumbers[sellerIndex] = land.citizenshipNumbers[numOwners - 1];
             land.citizenshipNumbers.pop();
-            land.citizenshipNumbers.push(_buyerCitizenshipNo);
+        } else {
+            // In-place replacement saves gas compared to swap + pop + push
+            land.citizenshipNumbers[sellerIndex] = _buyerCitizenshipNo;
         }
 
         emit PropertyTransferred(_landId, _sellerCitizenshipNo, _buyerCitizenshipNo, _price);
@@ -241,7 +330,7 @@ contract DMalpot is Ownable, ReentrancyGuard {
     function setLandCategory(uint256 _landId, LandCategory _newCategory) external onlyOfficer landExists(_landId) {
         Property storage land = properties[_landId];
         if (land.isFrozen) revert PropertyIsFrozen();
-        
+
         LandCategory oldCategory = land.category;
         if (oldCategory == _newCategory) revert SameCategoryError();
 
@@ -284,12 +373,12 @@ contract DMalpot is Ownable, ReentrancyGuard {
         return citizenToLandIds[_citizenshipNo];
     }
 
-    function getLandsByWard(
-        string memory _district,
-        string memory _localGovernment,
-        uint8 _wardNumber
-    ) external view returns (uint256[] memory) {
-        bytes32 wardKey = keccak256(abi.encodePacked(_district, _localGovernment, _wardNumber));
+    function getLandsByWard(string memory _district, string memory _localGovernment, uint8 _wardNumber)
+        external
+        view
+        returns (uint256[] memory)
+    {
+        bytes32 wardKey = keccak256(abi.encode(_district, _localGovernment, _wardNumber));
         return wardToLandIds[wardKey];
     }
 
@@ -297,7 +386,12 @@ contract DMalpot is Ownable, ReentrancyGuard {
         return landBoundaries[_landId];
     }
 
-    function verifyDocumentHash(uint256 _landId, bytes32 _submittedHash) external view landExists(_landId) returns (bool) {
+    function verifyDocumentHash(uint256 _landId, bytes32 _submittedHash)
+        external
+        view
+        landExists(_landId)
+        returns (bool)
+    {
         return properties[_landId].documentHash == _submittedHash;
     }
 }
